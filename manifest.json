@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Apple Careers Autofill",
+  "version": "1.0",
+  "description": "Autofill job descriptions on Apple Careers portal",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["https://jobs.apple.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://jobs.apple.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
