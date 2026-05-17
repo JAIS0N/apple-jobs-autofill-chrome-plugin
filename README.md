@@ -1,6 +1,6 @@
 # Apple Careers Autofill Extension
 
-A Chrome/Edge browser extension that autofills job description fields on Apple's careers portal (`jobs.apple.com`) — tailored per resume type.
+A Chrome/Edge browser extension that autofills job description fields on Apple's careers portal (`jobs.apple.com`) by parsing your LaTeX resume on the fly.
 
 ---
 
@@ -15,16 +15,16 @@ After digging into the browser DevTools, the root cause turned out to be a chain
 3. Without that script, the widget throws an uncaught React error and the autofill section never renders — even the "Autofill from Resume" button (which has nothing to do with LinkedIn) stays hidden.
 4. Even after disabling blockers, Apple appears to A/B test which widget version users see. Some users get both "Autofill from Resume" and "Apply with LinkedIn". Others only get the LinkedIn option — with no way to force the resume parser.
 
-Since the autofill widget is unreliable and resume-tailoring per role is important, this extension bypasses the problem entirely by injecting your pre-written, role-specific bullet points directly into the form fields.
+Since the autofill widget is unreliable and resume-tailoring per role is important, this extension bypasses the problem entirely by parsing your LaTeX resume directly and injecting the matching bullet points into each form field.
 
 ---
 
 ## What It Does
 
+- Parses your LaTeX resume in the popup — no files stored, no data sent anywhere
 - Detects all employer/job description card sections on the Apple careers Profile Information page
 - Matches each card to the right employer by reading the employer name input
-- Injects your tailored bullet points directly into the job description textareas using React's internal setter (so the form registers the values correctly on submit)
-- Supports two resume profiles: **ML Engineer** and **Software Engineer (SDE)**
+- Injects the corresponding bullet points directly into the job description textareas using React's internal setter (so the form registers the values correctly on submit)
 
 ---
 
@@ -36,7 +36,7 @@ This extension is not on the Chrome Web Store. Install it in developer mode:
 2. Go to `chrome://extensions` (Chrome) or `edge://extensions` (Edge)
 3. Toggle **Developer mode** on (top-right corner)
 4. Click **Load unpacked**
-5. Select the `apple-autofill-extension` folder
+5. Select the extension folder
 
 The extension icon will appear in your browser toolbar.
 
@@ -48,36 +48,32 @@ The extension icon will appear in your browser toolbar.
 2. Upload your resume on the **Add Resume** step and click **Continue**
 3. On the **Profile Information** step, fill in your employer names (or let LinkedIn autofill do it if it works for you)
 4. Click the extension icon in the toolbar
-5. Select **Machine Learning** or **Software Engineer** depending on the role
-6. All job description fields are filled instantly with the matching bullet points
+5. Paste your LaTeX resume into the text area
+6. Click **Autofill job descriptions**
 
-The status message in the popup tells you how many employers were matched and flags any it couldn't find.
+The extension parses your LaTeX on the spot, matches each form card to the right employer, and fills every job description field. The status bar shows how many employers were matched and flags any it couldn't find.
+
+Nothing is saved — paste fresh each time, or keep the popup open while you apply.
 
 ---
 
-## Customizing Your Bullet Points
+## How the LaTeX Parser Works
 
-Open `content.js` and edit the `descriptions` object. It has two top-level keys — `ml` and `sde` — each containing employer-keyed bullet point strings.
+The parser looks for job header lines — any line that contains both a `\company{...}` tag and a year or date. It extracts the company name from the tag, then collects every `\item` beneath it as bullet points until the next employer header.
 
-```js
-const descriptions = {
-  ml: {
-    "your employer name": `• First bullet point.
-• Second bullet point.
-• Third bullet point.`,
-    ...
-  },
-  sde: {
-    "your employer name": `• First bullet point.
-• Second bullet point.`,
-    ...
-  }
-};
+Your LaTeX format is used as-is. A block like this:
+
+```latex
+\noindent Software Engineer, \company{Ancestry} -- Lehi, UT \hfill Feb.\ 2026 -- Present
+\begin{itemize}
+  \item Built compliance auditing tool across 1000+ repos...
+  \item Reduced PII detection false positives by 95\%...
+\end{itemize}
 ```
 
-Employer matching is case-insensitive and uses `includes()` — so `"ancestry"` will match `"Ancestry.com"`, `"Ancestry (Lehi, UT)"`, etc. Keep keys short and lowercase.
+becomes the key `ancestry` mapped to those two bullet points, which gets injected into the Ancestry card on the form.
 
-After editing, go back to `chrome://extensions` and click the **refresh icon** on the extension card to reload it.
+Employer matching is case-insensitive and uses `includes()` — so `ancestry` matches `"Ancestry.com"`, `"Ancestry (Lehi, UT)"`, etc. Keep `\company{}` values short and unambiguous.
 
 ---
 
@@ -86,9 +82,9 @@ After editing, go back to `chrome://extensions` and click the **refresh icon** o
 ```
 apple-autofill-extension/
 ├── manifest.json   # Extension config (permissions, host matches)
-├── content.js      # Autofill logic + bullet point descriptions
-├── popup.html      # Extension popup UI
-├── popup.js        # Popup button handlers + messaging
+├── content.js      # Form detection, employer matching, field injection
+├── popup.html      # Extension popup UI (LaTeX textarea + fill button)
+├── popup.js        # LaTeX parser + messaging to content script
 └── icon.png        # Toolbar icon
 ```
 
@@ -96,14 +92,14 @@ apple-autofill-extension/
 
 ## Why Not Just Use LinkedIn Autofill?
 
-LinkedIn autofill pulls from a single fixed profile. If you tailor different resumes for different roles (ML vs SDE, for example), LinkedIn will fill every application with the same generic profile — defeating the purpose of tailoring. This extension lets you maintain separate, role-specific bullet points and apply them with one click.
+LinkedIn autofill pulls from a single fixed profile. If you tailor different resumes for different roles, LinkedIn fills every application with the same generic profile — defeating the purpose of tailoring. This extension reads whichever LaTeX resume you paste, so you stay in control of what goes into each application.
 
 ---
 
 ## Limitations
 
 - Only works on `jobs.apple.com` (host permission is scoped to that domain)
-- Employer matching is fuzzy string match — if Apple's form pre-populates an employer name very differently from your key, you may need to adjust the key in `content.js`
+- Employer matching is fuzzy string match — if Apple's form pre-populates an employer name very differently from your `\company{}` value, you may need to adjust it
 - Requires Developer Mode (cannot be published to the Chrome Web Store without a developer account)
 
 ---
